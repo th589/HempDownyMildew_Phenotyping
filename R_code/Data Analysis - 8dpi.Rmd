@@ -1,0 +1,1259 @@
+---
+title: "2024 Hemp Downy Mildew Experiment 8dpi Analysis"
+author: "Taylere Herrmann"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r, message=FALSE}
+# Loading additional libraries:
+library(tidyverse)
+library(lme4)
+library(lmerTest)
+library(emmeans)
+library(car)
+```
+
+# Data preprocessing
+
+```{r}
+# Import dataset
+df <- read.csv("Full_dataset.csv", na.strings = ".")
+```
+
+
+```{r}
+# rename accession with proper cultivar names:
+# list accession numbers and their corresponding cultivar names 
+name_map <- c(
+  "G33203" = "Cherry Wine",
+  "G33208" = "Magic Bullet 5",
+  "G33209" = "Spectrum",
+  "G33236" = "FL 58",
+  "G33294" = "BaOx",
+  "G33314" = "AC/DC",
+  "G33315" = "Otto II",
+  "G33337" = "Tisza",
+  "G33341" = "Tiborszallasi",
+  "G33344" = "Blue Kross",
+  "G33365" = "Queen Dream",
+  "G33368" = "Henola",
+  "G33370" = "SS Beta",
+  "G33371" = "Bialobrzeskie",
+  "G33376" = "Fibror 79",
+  "G33379" = "Santhica 27",
+  "G33380" = "Santhica 70",
+  "G33382" = "PhotoCBD",
+  "G33534" = "G33534 23UO SD",
+  "G33574" = "Ursa® 'Grande'",
+  "G33575" = "Ursa® 'Alta'",
+  "G33580" = "TJs CBD",
+  "G33591" = "USO 31",
+  "G33592" = "Carmagnola",
+  "G33650" = "CFX-2",
+  "GVA-H-20-1144" = "Sweet Caroline",
+  "G33571" = "GVA-H-21-1077",
+  "G33573" = "GVA-H-22-1166",
+  "G33576" = "GVA-H-23-1142")
+
+#Turn the named vector into a dataframe for joining
+name_map_df <- tibble(
+  Accession = names(name_map),
+  Cultivar = unname(name_map)
+)
+
+# Join and overwrite Accession values with cultivar names where available
+df <- df %>%
+  left_join(name_map_df, by = "Accession") %>%
+  mutate(Accession = if_else(!is.na(Cultivar), Cultivar, Accession)) %>%
+  select(-Cultivar)  # optional: remove the now-unnecessary column
+
+```
+
+## Blackbird
+
+```{r}
+# Filter for Blackbird ratings and calculate averages:
+BB_df <- df %>% 
+  filter(Rating =="Blackbird", Isolate == 22031) %>% 
+  #mutate(Accession = gsub("^G(?=\\d)", "G ", Accession, perl = TRUE)) %>%  # Add space after G
+  group_by(Accession, Rep) %>% 
+  summarise(across(c("X0dpi", "X5dpi", "X6dpi", "X7dpi", "X8dpi", "X9dpi"), 
+                   ~round(mean(.x, na.rm = TRUE), 1)))
+
+# Saving Blackbird (BB) averaged (1 value per 5 disc plot) data to its own csv file. 
+write_csv(BB_df, file ="BB_average.csv")
+```
+
+#Leaf disc (labeled plot)
+
+```{r}
+# Leaf disc rating by eye dataframe and csv
+plot_df <- df %>% 
+  filter(Rating == "Plot", Isolate == 22031) %>% 
+  group_by(Accession, Rep) %>% 
+  summarise(across(c("X0dpi", "X5dpi", "X6dpi", "X7dpi", "X8dpi", "X9dpi"), 
+                   ~round(mean(.x, na.rm = TRUE), 1)))
+
+# Save csv file
+write_csv(plot_df, file ="Plot_average.csv")
+```
+
+## Detached leaf
+
+```{r}
+# Detached leaf assay dataframe and csv
+detached_df <- df %>% 
+  filter(Rating == "Detached", Isolate == 22031) %>% 
+  group_by(Accession, Rep) %>% 
+  summarise(across(c("X0dpi", "X5dpi", "X6dpi", "X7dpi", "X8dpi", "X9dpi"), 
+                    ~round(mean(.x, na.rm = TRUE), 1)))
+  # Rounded to one decimal place
+
+# Save csv file 
+write_csv(detached_df, file ="Detached_average.csv")
+```
+
+------------------------------------------------------------------------
+
+# Blackbird Neural Network Rating - 8dpi
+
+## Transformation
+
+```{r}
+BB_df <- read_csv("BB_average.csv")
+
+#Arcsine transformation:
+BB_df <- BB_df %>% 
+  mutate(across(c(X0dpi, X5dpi, X6dpi, X7dpi, X8dpi, X9dpi), 
+                ~asin(sqrt(.x/100)), 
+                .names = "a{.col}")) #transformed columns have an "a" infront
+
+# Save as a .csv (helpful for later)
+write_csv(BB_df, file ="BB_transformed.csv")
+
+# Calculate mean and standard error for each timepoint by accession for raw (nontransformed) data
+BB_summary <- BB_df %>% 
+  group_by(Accession) %>% 
+  summarise(across (starts_with("X"),
+                    list(mean = ~round(mean(.x, na.rm = TRUE), 4),
+                         stderr = ~round(sd(.x, na.rm = TRUE)/ sqrt(n()), 4)), 
+                    .names = "{.col}_{.fn}"))
+
+# Make a separate data frame with just 8dpi info
+BB_8dpi_summary <- BB_summary %>%
+  select(Accession, X8dpi_mean, X8dpi_stderr)
+
+```
+
+## Linear Mixed Model
+
+```{r}
+#linear mixed model
+model <- lmer(aX8dpi ~ Accession + (1 | Rep), data = BB_df)
+
+summary(model) 
+
+#lsmeans
+lsmeans_results <- emmeans(model, ~ Accession)
+```
+
+## Dunnett - Post Hoc
+
+```{r}
+# Dunnett's test with only G33312, a high severity accession
+dunnett_G33312 <- contrast(lsmeans_results, method = "dunnett", ref = c("G33312"), adjust = "none")
+
+# Convert results to a dataframe:
+dunnett_G33312_df <- as.data.frame(dunnett_G33312)
+
+# Filter for significant pvalues (p<0.05)
+sig_G33312 <- dunnett_G33312_df %>% 
+  filter(p.value <= 0.05)
+
+# Count the number of significant pvalues
+sig_G33312_count <- nrow(sig_G33312)
+
+# Print the number of significant p-values
+print(paste("The number of accessions that have significanlty less disease than the susceptible control is:", sig_G33312_count))
+```
+
+```{r}
+# Make a new dataframe denoting which accession comparisons are significant, and which are not
+dunnett_G33312_df <- dunnett_G33312_df %>%
+  mutate(significant = ifelse(p.value <= 0.05, "Yes", "No")) %>% # new column with significance
+  select(-estimate, -SE, -df, -t.ratio) %>%  # removing columns I dont want 
+  separate(contrast, into = c("Accession", "Reference"), sep = "-") # separating the first column so accessions is separate from G33379
+```
+
+```{r}
+# Dunnett's test with only G33379, a low severity accession
+dunnett_G33379<- contrast(lsmeans_results, method = "dunnett", ref = c("Santhica 27"), adjust = "none")
+
+# Convert results to a dataframe:
+dunnett_G33379_df <- as.data.frame(dunnett_G33379)
+
+# Filter for significant pvalues (p<0.05)
+sig_G33379 <- dunnett_G33379_df %>% 
+  filter(p.value <= 0.05)
+
+# Count the number of significant pvalues
+sig_G33379_count <- nrow(sig_G33379)
+
+# Print the number of significant p-values
+print(paste("The number of accessions that have significanlty more disease than the resistant control is:", sig_G33379_count))
+```
+
+## Organizing Dunnett data
+
+```{r}
+# Make a new dataframe denoting which accession comparisons are significant, and which are not
+dunnett_G33379_df <- dunnett_G33379_df %>%
+  mutate(significant = ifelse(p.value <= 0.05, "Yes", "No")) %>% # New column with significance
+  select(-estimate, -SE, -df, -t.ratio) %>%  # Removing columns I dont want 
+  separate(contrast, into = c("Accession", "Reference"), sep = "-") # Separating the first column so accessions is separate from G33379
+```
+
+```{r}
+# Merge data - 8dpi mean and standard error (BB_8dpi_summary) with Dunnett pvalues from G33312 
+
+# Dataframes weren't merging properly so first need to trim white space
+BB_8dpi_summary$Accession <- trimws(BB_8dpi_summary$Accession)
+dunnett_G33312_df$Accession <- trimws(dunnett_G33312_df$Accession)
+
+# Leftjoin with accession  
+merged_df <- BB_8dpi_summary %>%
+  left_join(dunnett_G33312_df, by = "Accession")
+
+# Edit merged df column names
+merged_df <- merged_df %>% 
+  select (-Reference) %>% 
+  rename(G33312_p.value = p.value, G33312_significant = significant)
+```
+
+```{r}
+# Merge dunnett_G33379_df in with new merged dataframe (8dpi mean and std error and G33312)
+
+# Dataframes weren't merging properly so first need to trim white space
+dunnett_G33379_df$Accession <- trimws(dunnett_G33379_df$Accession)
+
+# Leftjoin with accession  
+merged_df_full <- merged_df %>%
+  left_join(dunnett_G33379_df, by = "Accession")
+
+# Edit merged column names for clarity
+merged_df_BB <- merged_df_full %>% 
+  select (-Reference) %>% 
+  rename(G33379_p.value = p.value, G33379_significant = significant)
+
+# Round mean and error to 2 decimal places, and p.values to 3 decimal places 
+merged_df_BB <- merged_df_BB %>%
+  mutate(across(c(X8dpi_mean, X8dpi_stderr), round, 2)) %>%
+  mutate(across(c(G33312_p.value, G33379_p.value), round, 3))
+```
+
+```{r}
+# Saving Blackbird merged Dunnett results 
+write_csv(merged_df_BB, file = "8dpi/BB_Dunnett.csv")
+```
+
+## BLUP calculation (best linear unbiased prediction, 8dpi on arcsin transformed data)
+
+```{r}
+# Fit the LMM for arcsine-transformed data
+bb_blup_model <- lmer(aX8dpi ~ 1 + 
+                     (1|Accession) + 
+                     (1|Rep), 
+                   data = BB_df)
+
+# Extract BLUPs for Accession
+blup_df <- ranef(bb_blup_model)$Accession %>%
+  as.data.frame() %>%
+  rename(blup_aX8dpi = `(Intercept)`) %>%
+  mutate(Accession = rownames(ranef(bb_blup_model)$Accession))
+
+# Calculate per-accession means
+summary_means <- BB_df %>%
+  group_by(Accession) %>%
+  summarise(
+    mean_X8dpi = mean(X8dpi, na.rm = TRUE),
+    mean_aX8dpi = mean(aX8dpi, na.rm = TRUE)
+  )
+
+# Combine means and BLUPs
+blup_summary <- summary_means %>%
+  left_join(blup_df, by = "Accession") %>%
+  dplyr::select(Accession, mean_X8dpi, mean_aX8dpi, blup_aX8dpi)
+
+# Export to CSV
+write.csv(blup_summary, "8dpi/BB_BLUP.csv", row.names = FALSE)
+
+# Rank accessions by BLUP (lower BLUP = more resistant)
+blup_ranked <- blup_summary %>%
+  arrange(blup_aX8dpi) %>%
+  mutate(Rank = row_number())
+
+#Export ranked table
+#write.csv(blup_ranked, "8dpi/BB_BLUP_ranked.csv", row.names = FALSE)
+```
+
+## Visualize Susceptible Control Significance (G33312, 8dpi)
+
+```{r,warning = FALSE}
+# Load the data
+df_fig1 <- read.csv("8dpi/BB_Dunnett.csv")
+
+# Categorize bars for coloring
+df_fig1 <- df_fig1 %>%
+  mutate(Group = case_when(
+    G33312_significant == "Yes" ~ "Significant",
+    TRUE ~ "Not significant"
+  ))
+
+# Reorder legend
+df_fig1$Group <- factor(df_fig1$Group, levels = c("Significant", "Not significant"))
+
+# Order bars by mean severity
+df_fig1 <- df_fig1 %>% arrange(X8dpi_mean)
+
+# Define fill color
+fill_colors <- c("Significant" = "#4D4D4D", "Not significant" = "#D9D9D9")
+ #old sig colors #4C8C8A not sig gray
+# Plot
+p1 <- ggplot(df_fig1, aes(x = reorder(Accession, X8dpi_mean), y = X8dpi_mean, fill = Group)) +
+  geom_bar(stat = "identity", alpha = 0.80) +
+  geom_errorbar(aes(ymin = X8dpi_mean - X8dpi_stderr, ymax = X8dpi_mean + X8dpi_stderr), 
+                width = 0.3, 
+                color = "#000000", #could use grey30 or #1A1A1A
+                alpha = 0.6) + #changes the color of the errorbars 
+  scale_fill_manual(
+    values = fill_colors, 
+    labels = c("Significant" = "Significantly Less Disease", 
+             "Not significant" = "No Significant Difference")
+) +
+  theme_classic() +
+  theme(
+    plot.title = element_text(
+      hjust = 0.5, 
+      size = 12),
+    axis.text.x = element_text(
+      angle = 90,
+      vjust = 0.5,
+      hjust = 1,
+      size = 6,
+      color = "black" #all labels in black 
+    ),
+    axis.title = element_text(size = 12), # axis title 
+    legend.position = c(0, 1),
+    legend.justification = c("left", "top"),
+    legend.box.just = "left",
+    legend.margin = margin(20, 10, 10, 20), 
+    legend.key.size = unit(0.5, "cm"), 
+    legend.title = element_text(size = 11),
+    legend.text = element_text(size = 10)
+  ) +
+  labs(
+    x = "Accession",
+    y = "Disease Severity (0–100%)",
+    fill = "Statistical Difference from Susceptible Control"
+  ) +
+  ylim(0, 100)
+
+#put in arrow
+# Get the x-position of G33312
+g33312_index <- which(levels(reorder(df_fig1$Accession, df_fig1$X8dpi_mean)) == "G33312")
+
+# Add arrow far above the bar
+p1 <- p1 +
+  annotate("segment",
+           x = g33312_index, xend = g33312_index,
+           y = 96, yend = 86,  # place arrow well above y-axis limit
+           arrow = arrow(length = unit(0.2, "cm")),
+           color = "black")
+plot(p1)
+
+ggsave("8dpi/Figures/Blackbird_8dpi.tiff", plot = p1,dpi = 600,width = 6.5, height = 4.5, units = "in", compression = "lzw")     # APS requires LZW compression
+```
+
+------------------------------------------------------------------------
+
+# Leaf Disc Plot Rating by Eye - 8dpi
+
+## Transformation
+
+```{r}
+plot_df <- read_csv("Plot_average.csv")
+
+plot_df <- plot_df %>% 
+  mutate(across(c(X0dpi, X5dpi, X6dpi, X7dpi, X8dpi, X9dpi), 
+                ~asin(sqrt(.x/100)), 
+                .names = "a{.col}")) #transformed columns have an "a" infront
+
+# Save as a .csv (helpful for later)
+write_csv(plot_df, file ="plot_transformed.csv")
+
+# Calculate mean and standard error for each timepoint by accession (for raw data)
+plot_summary <- plot_df %>% 
+  group_by(Accession) %>% 
+  summarise(across (starts_with("X"),
+                    list(mean = ~round(mean(.x, na.rm = TRUE), 4),
+                         stderr = ~round(sd(.x, na.rm = TRUE)/ sqrt(n()), 4)), 
+                    .names = "{.col}_{.fn}"))
+
+# Make a separate data frame with just 8dpi info
+plot_8dpi_summary <- plot_summary %>%
+  select(Accession, X8dpi_mean, X8dpi_stderr)
+
+```
+
+## Linear Mixed Model
+
+```{r}
+#linear mixed model
+model <- lmer(aX8dpi ~ Accession + (1 | Rep), data = plot_df)
+
+summary(model) 
+
+#least squared means
+lsmeans_results <- emmeans(model, ~ Accession)
+```
+
+## Dunnett - Post Hoc
+
+```{r}
+# Dunnett's test with only G33312, a high severity accession
+dunnett_G33312 <- contrast(lsmeans_results, method = "dunnett", ref = c("G33312"), adjust = "none")
+
+# Convert results to a dataframe:
+dunnett_G33312_df <- as.data.frame(dunnett_G33312)
+
+# Filter for significant pvalues (p<0.05)
+sig_G33312 <- dunnett_G33312_df %>% 
+  filter(p.value <= 0.05)
+
+# Count the number of significant pvalues
+sig_G33312_count <- nrow(sig_G33312)
+
+# Print the number of significant p-values
+print(paste("The number of accessions that have significanlty less disease than the susceptible control is:", sig_G33312_count))
+```
+
+```{r}
+# Make a new dataframe denoting which accession comparisons are significant, and which are not
+dunnett_G33312_df <- dunnett_G33312_df %>%
+  mutate(significant = ifelse(p.value <= 0.05, "Yes", "No")) %>% # new column with significance
+  select(-estimate, -SE, -df, -t.ratio) %>%  # removing columns I dont want 
+  separate(contrast, into = c("Accession", "Reference"), sep = "-") # separating the first column so accessions is separate from G33379
+```
+
+```{r}
+# Dunnett's test with only G33379, a low severity accession
+dunnett_G33379<- contrast(lsmeans_results, method = "dunnett", ref = c("Santhica 27"), adjust = "none")
+
+# Convert results to a dataframe:
+dunnett_G33379_df <- as.data.frame(dunnett_G33379)
+
+# Filter for significant pvalues (p<0.05)
+sig_G33379 <- dunnett_G33379_df %>% 
+  filter(p.value <= 0.05)
+
+# Count the number of significant pvalues
+sig_G33379_count <- nrow(sig_G33379)
+
+# Print the number of significant p-values
+print(paste("The number of accessions that have significanlty more disease than the resistant control is", sig_G33379_count))
+```
+
+## Organizing Dunnett Data
+
+```{r}
+# Make a new dataframe denoting which accession comparisons are significant, and which are not
+dunnett_G33379_df <- dunnett_G33379_df %>%
+  mutate(significant = ifelse(p.value <= 0.05, "Yes", "No")) %>% # New column with significance
+  select(-estimate, -SE, -df, -t.ratio) %>%  # Removing columns I dont want 
+  separate(contrast, into = c("Accession", "Reference"), sep = "-") # Separating the first column so accessions is separate from G33379
+```
+
+```{r}
+# Merge data - 8dpi mean and standard error (plot_8dpi_summary) with Dunnett pvalues from G33312 
+
+# Dataframes weren't merging properly so first need to trim white space
+plot_8dpi_summary$Accession <- trimws(plot_8dpi_summary$Accession)
+dunnett_G33312_df$Accession <- trimws(dunnett_G33312_df$Accession)
+
+# Leftjoin with accession  
+merged_df <- plot_8dpi_summary %>%
+  left_join(dunnett_G33312_df, by = "Accession")
+
+merged_df <- merged_df %>% 
+  select (-Reference) %>% 
+  rename(G33312_p.value = p.value, G33312_significant = significant)
+```
+
+```{r}
+# Merge dunnett_G33379_df in with new merged dataframe (8dpi mean and std error and G33312)
+
+# Dataframes weren't merging properly so first need to trim white space
+dunnett_G33379_df$Accession <- trimws(dunnett_G33379_df$Accession)
+
+# Leftjoin with accession  
+merged_df_full <- merged_df %>%
+  left_join(dunnett_G33379_df, by = "Accession")
+
+# Edit merged column names for clarity
+merged_df_plot <- merged_df_full %>% 
+  select (-Reference) %>% 
+  rename(G33379_p.value = p.value, G33379_significant = significant)
+
+# Round mean and error to 2 decimal places, and p.values to 3 decimal places 
+merged_df_plot <- merged_df_plot %>%
+  mutate(across(c(X8dpi_mean, X8dpi_stderr), round, 2)) %>%
+  mutate(across(c(G33312_p.value, G33379_p.value), round, 3))
+```
+
+```{r}
+# Saving Blackbird merged Dunnett results 
+write_csv(merged_df_plot, file = "8dpi/Plot_Dunnett.csv")
+```
+
+## BLUP calculation (best linear unbiased prediction, 8dpi on arcsin transformed data)
+
+```{r}
+# Fit the LMM for arcsine-transformed data
+plot_blup_model <- lmer(aX8dpi ~ 1 + 
+                     (1|Accession) + 
+                     (1|Rep), 
+                   data = plot_df)
+
+# Extract BLUPs for Accession
+blup_df <- ranef(plot_blup_model)$Accession %>%
+  as.data.frame() %>%
+  rename(blup_aX8dpi = `(Intercept)`) %>%
+  mutate(Accession = rownames(ranef(plot_blup_model)$Accession))
+
+# Calculate per-accession means
+summary_means <- plot_df %>%
+  group_by(Accession) %>%
+  summarise(
+    mean_X8dpi = mean(X8dpi, na.rm = TRUE),
+    mean_aX8dpi = mean(aX8dpi, na.rm = TRUE)
+  )
+
+# Combine means and BLUPs
+blup_summary <- summary_means %>%
+  left_join(blup_df, by = "Accession") %>%
+  dplyr::select(Accession, mean_X8dpi, mean_aX8dpi, blup_aX8dpi)
+
+# Export to CSV
+write.csv(blup_summary, "8dpi/Plot_BLUP.csv", row.names = FALSE)
+
+# Rank accessions by BLUP (lower BLUP = more resistant)
+blup_ranked <- blup_summary %>%
+  arrange(blup_aX8dpi) %>%
+  mutate(Rank = row_number())
+
+# Export ranked table
+#write.csv(blup_ranked, "8dpi/Plot_BLUP_ranked.csv", row.names = FALSE)
+```
+
+## Visualize Susceptible Control Significance (G33312, 8dpi)
+
+```{r,warning = FALSE}
+# Load the data
+df_fig1 <- read.csv("8dpi/Plot_Dunnett.csv")
+
+# Categorize bars for coloring
+df_fig1 <- df_fig1 %>%
+  mutate(Group = case_when(
+    G33312_significant == "Yes" ~ "Significant",
+    TRUE ~ "Not significant"
+  ))
+
+# Reorder legend
+df_fig1$Group <- factor(df_fig1$Group, levels = c("Significant", "Not significant"))
+
+# Order bars by mean severity
+df_fig1 <- df_fig1 %>% arrange(X8dpi_mean)
+
+# Define fill color
+fill_colors <- c("Significant" = "#4D4D4D", "Not significant" = "#D9D9D9")
+
+# Plot
+p1 <- ggplot(df_fig1, aes(x = reorder(Accession, X8dpi_mean), y = X8dpi_mean, fill = Group)) +
+  geom_bar(stat = "identity", alpha = 0.80) +
+  geom_errorbar(aes(ymin = X8dpi_mean - X8dpi_stderr, ymax = X8dpi_mean + X8dpi_stderr), 
+                width = 0.3, 
+                color = "#000000", 
+                alpha = 0.6) + #changes the color of the errorbars 
+  scale_fill_manual(
+    values = fill_colors, 
+    labels = c("Significant" = "Significantly Less Disease", 
+             "Not significant" = "No Significant Difference")
+) +
+  theme_classic() +
+  theme(
+    plot.title = element_text(
+      hjust = 0.5, 
+      size = 12),
+    axis.text.x = element_text(
+      angle = 90,
+      vjust = 0.5,
+      hjust = 1,
+      size = 6,
+      color = "black"
+    ),
+    axis.title = element_text(size = 12), # axis title 
+    legend.position = c(0, 1),
+    legend.justification = c("left", "top"),
+    legend.box.just = "left",
+    legend.margin = margin(20, 10, 10, 20), 
+    legend.key.size = unit(0.5, "cm"), 
+    legend.title = element_text(size = 11),
+    legend.text = element_text(size = 10)
+  ) +
+  labs(
+    x = "Accession",
+    y = "Disease Severity (0–100%)",
+    fill = "Statistical Difference from Susceptible Control"
+  ) +
+  ylim(0, 100)
+
+#put in arrow
+# Get the x-position of G33312
+g33312_index <- which(levels(reorder(df_fig1$Accession, df_fig1$X8dpi_mean)) == "G33312")
+
+# Add arrow far above the bar
+p1 <- p1 +
+  annotate("segment",
+           x = g33312_index, xend = g33312_index,
+           y = 110, yend = 100,  # place arrow well above y-axis limit
+           arrow = arrow(length = unit(0.2, "cm")),
+           color = "black")
+# Extend the Y axis to accommodate the arrow and keep y axis marks 
+p1 <- p1 +
+  scale_y_continuous(
+    limits = c(0, 110),                  # allows room for the arrow
+    breaks = c(0, 25, 50, 75, 100)       # custom tick marks
+  )
+plot(p1)
+
+ggsave("8dpi/Figures/Leaf_disc_8dpi.tiff", plot = p1,dpi = 600,width = 6.5, height = 4.5, units = "in", compression = "lzw")     # APS requires LZW compression
+```
+
+------------------------------------------------------------------------
+
+# Detached Leaf Rating by Eye - 8dpi
+
+## Transformation
+
+```{r}
+detached_df <- read_csv("Detached_average.csv")
+
+detached_df <- detached_df %>% 
+  mutate(across(c(X0dpi, X5dpi, X6dpi, X7dpi, X8dpi, X9dpi), 
+                ~asin(sqrt(.x/100)), 
+                .names = "a{.col}")) #transformed columns have an "a" infront
+
+# Save as a .csv (helpful for later)
+write_csv(detached_df, file ="detached_transformed.csv")
+
+# Calculate mean and standard error for each timepoint by accession
+detached_summary <- detached_df %>% 
+  group_by(Accession) %>% 
+  summarise(across (starts_with("X"),
+                    list(mean = ~round(mean(.x, na.rm = TRUE), 4),
+                         stderr = ~round(sd(.x, na.rm = TRUE)/ sqrt(n()), 4)), 
+                    .names = "{.col}_{.fn}"))
+
+# Make a separate data frame with just 8dpi info
+detached_8dpi_summary <- detached_summary %>%
+  select(Accession, X8dpi_mean, X8dpi_stderr)
+```
+
+## Linear Mixed Model
+
+```{r}
+#linear mixed model 
+model <- lmer(aX8dpi ~ Accession + (1 | Rep), data = detached_df)
+
+summary(model) 
+
+#lsmeans
+lsmeans_results <- emmeans(model, ~ Accession)
+```
+
+## Dunnett - Post Hoc
+
+```{r}
+# Dunnett's test with only G33312, a high severity accession
+dunnett_G33312 <- contrast(lsmeans_results, method = "dunnett", ref = c("G33312"), adjust = "none")
+
+# Convert results to a dataframe:
+dunnett_G33312_df <- as.data.frame(dunnett_G33312)
+
+# Filter for significant pvalues (p<0.05)
+sig_G33312 <- dunnett_G33312_df %>% 
+  filter(p.value <= 0.05)
+
+# Count the number of significant pvalues
+sig_G33312_count <- nrow(sig_G33312)
+
+# Print the number of significant p-values
+print(paste("The number of accessions that have significanlty less disease than the susceptible control is:", sig_G33312_count))
+```
+
+```{r}
+# Make a new dataframe denoting which accession comparisons are significant, and which are not
+dunnett_G33312_df <- dunnett_G33312_df %>%
+  mutate(significant = ifelse(p.value <= 0.05, "Yes", "No")) %>% # new column with significance
+  select(-estimate, -SE, -df, -t.ratio) %>%  # removing columns I dont want 
+  separate(contrast, into = c("Accession", "Reference"), sep = "-") # separating the first column so accessions is separate from G33379
+```
+
+```{r}
+# Dunnett's test with only G33379, a low severity accession
+dunnett_G33379<- contrast(lsmeans_results, method = "dunnett", ref = c("Santhica 27"), adjust = "none")
+
+# Convert results to a dataframe:
+dunnett_G33379_df <- as.data.frame(dunnett_G33379)
+
+# Filter for significant pvalues (p<0.05)
+sig_G33379 <- dunnett_G33379_df %>% 
+  filter(p.value <= 0.05)
+
+# Count the number of significant pvalues
+sig_G33379_count <- nrow(sig_G33379)
+
+# Print the number of significant p-values
+print(paste("The number of accessions that have significanlty more disease than the resistant control is:", sig_G33379_count))
+```
+
+## Organizing Dunnett Data
+
+```{r}
+# Make a new dataframe denoting which accession comparisons are significant, and which are not
+dunnett_G33379_df <- dunnett_G33379_df %>%
+  mutate(significant = ifelse(p.value <= 0.05, "Yes", "No")) %>% # New column with significance
+  select(-estimate, -SE, -df, -t.ratio) %>%  # Removing columns I dont want 
+  separate(contrast, into = c("Accession", "Reference"), sep = "-") # Separating the first column so accessions is separate from G33379
+```
+
+```{r}
+# Merge data - 8dpi mean and standard error (detached_8dpi_summary) with Dunnett pvalues from G33312 
+
+# Dataframes weren't merging properly so first need to trim white space
+detached_8dpi_summary$Accession <- trimws(detached_8dpi_summary$Accession)
+dunnett_G33312_df$Accession <- trimws(dunnett_G33312_df$Accession)
+
+# Leftjoin with accession  
+merged_df <- detached_8dpi_summary %>%
+  left_join(dunnett_G33312_df, by = "Accession")
+
+# Edit merged df column names
+merged_df <- merged_df %>% 
+  select (-Reference) %>% 
+  rename(G33312_p.value = p.value, G33312_significant = significant)
+```
+
+```{r}
+# Merge dunnett_G33379_df in with new merged dataframe (8dpi mean and std error and G33312)
+
+# Dataframes weren't merging properly so first need to trim white space
+dunnett_G33379_df$Accession <- trimws(dunnett_G33379_df$Accession)
+
+# Leftjoin with accession  
+merged_df_full <- merged_df %>%
+  left_join(dunnett_G33379_df, by = "Accession")
+
+# Edit merged column names for clarity
+merged_df_detached <- merged_df_full %>% 
+  select (-Reference) %>% 
+  rename(G33379_p.value = p.value, G33379_significant = significant)
+
+# Round mean and error to 2 decimal places, and p.values to 3 decimal places 
+merged_df_detached <- merged_df_detached %>%
+  mutate(across(c(X8dpi_mean, X8dpi_stderr), round, 2)) %>%
+  mutate(across(c(G33312_p.value, G33379_p.value), round, 3))
+```
+
+```{r}
+# Saving Blackbird merged Dunnett results 
+write_csv(merged_df_detached, file = "8dpi/Detached_Dunnett.csv")
+```
+
+## BLUP calculation (best linear unbiased prediction, 8dpi on arcsin transformed data)
+
+## Detached Leaf (detached) - blup
+
+```{r}
+# Fit the LMM for arcsine-transformed data
+detached_blup_model <- lmer(aX8dpi ~ 1 + 
+                     (1|Accession) + 
+                     (1|Rep), 
+                   data = detached_df)
+
+# Extract BLUPs for Accession
+blup_df <- ranef(detached_blup_model)$Accession %>%
+  as.data.frame() %>%
+  rename(blup_aX8dpi = `(Intercept)`) %>%
+  mutate(Accession = rownames(ranef(detached_blup_model)$Accession))
+
+# Calculate per-accession means
+summary_means <- detached_df %>%
+  group_by(Accession) %>%
+  summarise(
+    mean_X8dpi = mean(X8dpi, na.rm = TRUE),
+    mean_aX8dpi = mean(aX8dpi, na.rm = TRUE)
+  )
+
+# Combine means and BLUPs
+blup_summary <- summary_means %>%
+  left_join(blup_df, by = "Accession") %>%
+  dplyr::select(Accession, mean_X8dpi, mean_aX8dpi, blup_aX8dpi)
+
+# Export to CSV
+write.csv(blup_summary, "8dpi/Detached_BLUP.csv", row.names = FALSE)
+
+# Rank accessions by BLUP (lower BLUP = more resistant)
+blup_ranked <- blup_summary %>%
+  arrange(blup_aX8dpi) %>%
+  mutate(Rank = row_number())
+
+# Export ranked table
+#write.csv(blup_ranked, "8dpi/Detached_BLUP_ranked.csv", row.names = FALSE)
+```
+
+## Visualize Susceptible Control Significance (G33312, 8dpi)
+
+```{r,warning = FALSE}
+# Load the data
+df_fig1 <- read.csv("8dpi/Detached_Dunnett.csv")
+
+# Categorize bars for coloring
+df_fig1 <- df_fig1 %>%
+  mutate(Group = case_when(
+    G33312_significant == "Yes" ~ "Significant",
+    TRUE ~ "Not significant"
+  ))
+
+# Reorder legend
+df_fig1$Group <- factor(df_fig1$Group, levels = c("Significant", "Not significant"))
+
+# Order bars by mean severity
+df_fig1 <- df_fig1 %>% arrange(X8dpi_mean)
+
+# Define fill color
+fill_colors <- c("Significant" = "#4D4D4D", "Not significant" = "#D9D9D9")
+
+# Plot
+p1 <- ggplot(df_fig1, aes(x = reorder(Accession, X8dpi_mean), y = X8dpi_mean, fill = Group)) +
+  geom_bar(stat = "identity", alpha = 0.80) +
+  geom_errorbar(aes(ymin = X8dpi_mean - X8dpi_stderr, ymax = X8dpi_mean + X8dpi_stderr), 
+                width = 0.3, 
+                color = "#000000", 
+                alpha = 0.6) + #changes the color of the errorbars 
+  scale_fill_manual(
+    values = fill_colors, 
+    labels = c("Significant" = "Significantly Less Disease", 
+             "Not significant" = "No Significant Difference")
+) +
+  theme_classic() +
+  theme(
+    plot.title = element_text(
+      hjust = 0.5,
+      size = 12),
+    axis.text.x = element_text(
+      angle = 90,
+      vjust = 0.5,
+      hjust = 1,
+      size = 6,
+      color = "black"
+    ),
+    axis.title = element_text(size = 12), # axis title 
+    legend.position = c(0, 1),
+    legend.justification = c("left", "top"),
+    legend.box.just = "left",
+    legend.margin = margin(20, 10, 10, 20), 
+    legend.key.size = unit(0.5, "cm"), 
+    legend.title = element_text(size = 11),
+    legend.text = element_text(size = 10)
+  ) +
+  labs(
+    x = "Accession",
+    y = "Disease Severity (0–100%)",
+    fill = "Statistical Difference from Susceptible Control"
+  ) +
+  ylim(0, 100)
+
+#put in arrow
+# Get the x-position of G33312
+g33312_index <- which(levels(reorder(df_fig1$Accession, df_fig1$X8dpi_mean)) == "G33312")
+
+# Add arrow far above the bar
+p1 <- p1 +
+  annotate("segment",
+           x = g33312_index, xend = g33312_index,
+           y = 110, yend = 100,  # place arrow well above y-axis limit
+           arrow = arrow(length = unit(0.2, "cm")),
+           color = "black")
+# Extend the Y axis to accommodate the arrow and keep y axis marks 
+p1 <- p1 +
+  scale_y_continuous(
+    limits = c(0, 110),                  # allows room for the arrow
+    breaks = c(0, 25, 50, 75, 100)       # custom tick marks
+  )
+
+plot(p1)
+
+ggsave("8dpi/Figures/Detached_8dpi.tiff", plot = p1, dpi = 600,width = 6.5,height = 4.5,units = "in", compression = "lzw")     # APS requires LZW compression
+```
+
+------------------------------------------------------------------------
+
+# Rating method comparison:
+
+## Visualize accession by method (Manuscript figure)
+
+```{r,message=FALSE}
+# Load Dunnett data
+detached <- read_csv("8dpi/Detached_Dunnett.csv")
+plot_eye <- read_csv("8dpi/Plot_Dunnett.csv")
+bb <- read_csv("8dpi/BB_Dunnett.csv")
+
+# Add a rating method column and extract mean severity at 8dpi
+detached <- detached %>%
+  select(Accession, X8dpi_mean) %>%
+  mutate(Method = "Detached")
+
+plot_eye <- plot_eye %>%
+  select(Accession, X8dpi_mean) %>%
+  mutate(Method = "Plot")
+
+bb <- bb %>%
+  select(Accession, X8dpi_mean) %>%
+  mutate(Method = "Blackbird")
+
+# Combine all three datasets
+all_data <- bind_rows(detached, plot_eye, bb)
+```
+
+```{r}
+# Reorder accessions by average severity (low to high)
+accession_order <- all_data %>%
+  group_by(Accession) %>%
+  summarize(avg_severity = mean(X8dpi_mean, na.rm = TRUE)) %>%
+  arrange(avg_severity) %>%
+  pull(Accession)
+    # To organize the accessions by disease severity, the average X8dpi_mean is calculated across all three rating methods for each accession, and accessions are sorted from lowest to highest mean severity 
+
+all_data$Accession <- factor(all_data$Accession, levels = accession_order)
+
+# Legend order 
+all_data$Method <- factor(all_data$Method, levels = c("Blackbird", "Plot", "Detached"))
+
+# Legend labels
+method_labels <- c(
+  "Blackbird" = "Leaf Discs Rated by Blackbird Neural Network",
+  "Plot" = "Leaf Discs Rated Visually",
+  "Detached" = "Detached Leaves Rated Visually")
+
+# colors and point shapes
+method_grays <- c(
+  "Blackbird" = "gray10",
+  "Plot" = "gray40",
+  "Detached" = "gray70")
+
+method_shapes <- c(
+   "Blackbird" = 16,
+  "Plot" = 17,
+  "Detached" = 15) #circle, triangle, square
+```
+
+```{r}
+# Plot
+all_ratings_plot_gray <- ggplot(all_data, aes(x = Accession, y = X8dpi_mean)) +
+  geom_line(aes(group = Accession), color = "gray50", size = 0.3, alpha = 0.6) +
+  geom_point(aes(color = Method, shape = Method), 
+             position = position_dodge(width = 0.5), 
+             size = 2.5) +
+  scale_color_manual(values = method_grays, labels = method_labels) +
+  scale_shape_manual(values = method_shapes, labels = method_labels) + 
+  guides(
+    color = guide_legend(title = "Rating Method"),
+    shape = guide_legend(title = "Rating Method")) +
+  
+  labs(
+    x = "Accession", 
+    y = "Disease Severity (0–100%)",
+  ) +
+  theme_classic() +
+  theme(
+    plot.title = element_text(
+      hjust = 0.5, 
+      size = 12), # main title 
+    axis.text.x = element_text(
+      angle = 90,
+      vjust = 0.5,
+      hjust = 1,
+      size = 6,
+      color = "black"
+    ),
+    axis.title = element_text(size = 12), # axis title 
+    legend.position = c(0, 1),
+    legend.justification = c("left", "top"),
+    legend.box.just = "left",
+    legend.margin = margin(20, 10, 10, 20),
+    legend.key.size = unit(0.5, "cm"),
+    legend.title = element_text(size = 11),
+    legend.text = element_text(size = 10)
+  ) +
+  ylim(0, 100)
+plot(all_ratings_plot_gray)
+
+#Save Plot: 
+ggsave("8dpi/Figures/All_rating_methods_8dpi_gray.tiff", plot = all_ratings_plot_gray,dpi = 600, width = 6.5, height = 4.5, units = "in", compression = "lzw")
+```
+
+## Resistant accessions across methods:
+
+```{r}
+# Prepare each method:
+BB_long <- BB_df %>% 
+  select(Accession, Rep, X8dpi) %>% 
+  rename(BB = X8dpi)
+plot_long <- plot_df %>% 
+  select(Accession, Rep, X8dpi) %>% 
+  rename(Plot = X8dpi)
+detached_long <- detached_df %>% 
+  select(Accession, Rep, X8dpi) %>% 
+  rename(Detached = X8dpi)
+
+# Flag accessions consistently <1% and ==0% per method
+flag_method <- function(df, varname) {
+  df %>%
+    group_by(Accession) %>%
+    summarise(
+      all_below_5 = all(.data[[varname]] < 5, na.rm = TRUE),
+      all_below_1 = all(.data[[varname]] < 1, na.rm = TRUE),
+      all_zero = all(.data[[varname]] == 0, na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    rename_with(~ paste0(varname, "_", .), -Accession)
+}
+
+# Apply to each method
+BB_flags <- flag_method(BB_long, "BB")
+plot_flags <- flag_method(plot_long, "Plot")
+detached_flags <- flag_method(detached_long, "Detached")
+
+# Merge all
+all_flags <- BB_flags %>%
+  full_join(plot_flags, by = "Accession") %>%
+  full_join(detached_flags, by = "Accession")
+
+# Add summary flags: all three methods <1% and ==0%
+final_table <- all_flags %>%
+  mutate(
+    all_methods_below_5 = BB_all_below_5 & Plot_all_below_5 & Detached_all_below_5,
+    all_methods_below_1 = BB_all_below_1 & Plot_all_below_1 & Detached_all_below_1,
+    all_methods_zero = BB_all_zero & Plot_all_zero & Detached_all_zero
+  )
+
+# Save
+write_csv(final_table, "8dpi/Resistant_Entries.csv")
+```
+
+```{r}
+# Helper function to pad each vector to the same length
+pad_to_length <- function(vec, max_length) {
+  length(vec) <- max_length  # adds NA if needed
+  return(vec)
+}
+
+# Create named lists of accessions per group
+accession_groups <- list(
+  `BB <5%` = final_table %>% filter(BB_all_below_5) %>% pull(Accession),
+  `Plot <5%` = final_table %>% filter(Plot_all_below_5) %>% pull(Accession),
+  `Detached <5%` = final_table %>% filter(Detached_all_below_5) %>% pull(Accession),
+  `BB <1%` = final_table %>% filter(BB_all_below_1) %>% pull(Accession),
+  `Plot <1%` = final_table %>% filter(Plot_all_below_1) %>% pull(Accession),
+  `Detached <1%` = final_table %>% filter(Detached_all_below_1) %>% pull(Accession),
+  `BB = 0%` = final_table %>% filter(BB_all_zero) %>% pull(Accession),
+  `Plot = 0%` = final_table %>% filter(Plot_all_zero) %>% pull(Accession),
+  `Detached = 0%` = final_table %>% filter(Detached_all_zero) %>% pull(Accession),
+  `All methods <5%` = final_table %>% filter(all_methods_below_5) %>% pull(Accession),
+  `All methods <1%` = final_table %>% filter(all_methods_below_1) %>% pull(Accession),
+  `All methods = 0%` = final_table %>% filter(all_methods_zero) %>% pull(Accession)
+)
+
+# Find the longest list length
+max_length <- max(lengths(accession_groups))
+
+# Pad each vector and convert to a tibble
+accession_table <- accession_groups %>%
+  map(~ pad_to_length(.x, max_length)) %>%
+  as_tibble()
+
+# View or export
+write_csv(accession_table, "8dpi/Resistant_Entries.csv")
+```
+
+## Susceptable accessions:
+
+```{r}
+# Mean severity per accession
+BB_means <- BB_df %>%
+  group_by(Accession) %>%
+  summarise(BB_mean = mean(X8dpi, na.rm = TRUE), .groups = "drop")
+
+plot_means <- plot_df %>%
+  group_by(Accession) %>%
+  summarise(Plot_mean = mean(X8dpi, na.rm = TRUE), .groups = "drop")
+
+detached_means <- detached_df %>%
+  group_by(Accession) %>%
+  summarise(Detached_mean = mean(X8dpi, na.rm = TRUE), .groups = "drop")
+```
+
+```{r}
+top10_BB <- BB_means %>%
+  arrange(desc(BB_mean)) %>%
+  slice_head(n = 10) %>%
+  pull(Accession)
+
+top10_plot <- plot_means %>%
+  arrange(desc(Plot_mean)) %>%
+  slice_head(n = 10) %>%
+  pull(Accession)
+
+top10_detached <- detached_means %>%
+  arrange(desc(Detached_mean)) %>%
+  slice_head(n = 10) %>%
+  pull(Accession)
+```
+
+```{r}
+consistently_susceptible <- Reduce(intersect, list(top10_BB, top10_plot, top10_detached))
+
+# Also get Top 5 from already sorted means
+top5_BB_sorted <- sort(top10_BB[1:5])
+top5_plot_sorted <- sort(top10_plot[1:5])
+top5_detached_sorted <- sort(top10_detached[1:5])
+
+# Find consistent top 5 across all methods
+top5_all_sorted <- Reduce(intersect, list(top5_BB_sorted, top5_plot_sorted, top5_detached_sorted)) %>% sort()
+
+# Pad helper
+pad_to_length <- function(vec, max_length) {
+  length(vec) <- max_length
+  return(vec)
+}
+
+# Put all into one named list
+accession_groups_susceptible <- list(
+  `Top 10 BB` = sort(top10_BB),
+  `Top 10 Plot` = sort(top10_plot),
+  `Top 10 Detached` = sort(top10_detached),
+  `Top 10 All Methods` = sort(consistently_susceptible),
+  `Top 5 BB` = top5_BB_sorted,
+  `Top 5 Plot` = top5_plot_sorted,
+  `Top 5 Detached` = top5_detached_sorted,
+  `Top 5 All Methods` = top5_all_sorted
+)
+
+#Pad and bind into initial table
+max_len <- max(lengths(accession_groups_susceptible))
+
+susceptible_table_extended <- accession_groups_susceptible %>%
+  map(~ pad_to_length(.x, max_len)) %>%
+  as_tibble()
+
+#Add mean severity values for consistent accessions
+
+#Combine accession means
+all_means <- BB_means %>%
+  full_join(plot_means, by = "Accession") %>%
+  full_join(detached_means, by = "Accession")
+
+# Calculate average severity across methods
+all_means <- all_means %>%
+  rowwise() %>%
+  mutate(Average_Severity = mean(c(BB_mean, Plot_mean, Detached_mean), na.rm = TRUE)) %>%
+  ungroup()
+
+# Add average severity values to the "Top 10 All Methods" and "Top 5 All Methods" columns
+susceptible_table_extended <- susceptible_table_extended %>%
+  mutate(
+    `Top 10 Avg Severity` = `Top 10 All Methods` %>%
+      map_dbl(~ all_means %>% filter(Accession == .x) %>% pull(Average_Severity) %>% first() %||% NA_real_),
+    `Top 5 Avg Severity` = `Top 5 All Methods` %>%
+      map_dbl(~ all_means %>% filter(Accession == .x) %>% pull(Average_Severity) %>% first() %||% NA_real_)
+  )
+
+#save 
+write_csv(susceptible_table_extended, "8dpi/Susceptible_Top10_Top5.csv")
+```
+
+## Statistical comparison of rating methods:
+
+```{r}
+BB_transformed <- read_csv("BB_transformed.csv")
+plot_transformed <- read_csv("plot_transformed.csv")
+detached_transformed <- read_csv("detached_transformed.csv")
+
+# combine 3 rating methods into one dataframe while retaining rep
+BB_8dpi <- BB_transformed %>%
+  select(Accession, Rep, aX8dpi) %>%
+  rename(BB = aX8dpi)
+
+LD_8dpi <- plot_transformed %>%
+  select(Accession, Rep, aX8dpi) %>%
+  rename(LD = aX8dpi)
+
+DL_8dpi <- detached_transformed %>%
+  select(Accession, Rep, aX8dpi) %>%
+  rename(DL = aX8dpi)
+
+# Merge by Accession and Rep
+comparison_df <- BB_8dpi %>%
+  inner_join(DL_8dpi, by = c("Accession", "Rep")) %>%
+  inner_join(LD_8dpi, by = c("Accession", "Rep"))
+
+# Pivot to long format for analysis
+comparison_long <- comparison_df %>%
+  pivot_longer(cols = c(BB, DL, LD), names_to = "method", values_to = "severity")
+
+```
+
+```{r}
+library(car)
+library(multcomp)
+library(multcompView)
+
+# Ensure factors are correctly set
+comparison_long$method <- as.factor(comparison_long$method)
+comparison_long$Rep <- as.factor(comparison_long$Rep)
+comparison_long$Accession <- as.factor(comparison_long$Accession)
+
+# Fit linear mixed model
+lmm <- lmer(severity ~ method + (1 | Rep) + (1 | Accession), data = comparison_long)
+
+# Model summary with Satterthwaite df
+summary(lmm)
+
+# Estimated marginal means
+emm <- emmeans(lmm, ~ method)
+
+# Pairwise differences + 95% CI (pdiff cl)
+pairs(emm, adjust = "tukey")
+confint(emm)
+
+# Compact letter display for Tukey
+cld(emm, adjust = "tukey")
+```
+
+| Method    | Estimated Severity | 95% Confidence interval | Tukey Group |
+|-----------|--------------------|-------------------------|-------------|
+| Detached  | 0.321              | 0.137 - 0.505           | A           |
+| Blackbird | 0.394              | 0.210 - 0.578           | B           |
+| Leaf Disc | 0.505              | 0.321 - 0.689           | C           |
