@@ -7,7 +7,7 @@ Code is seperated into two folders, Matlab and R. Here is the order in which the
 
 1. user_training_GUI_7.m (Matlab folder)
      - This was used to train the convolutional neural network to detect signs of _Pseudoperonospora cannabina__ (downy mildew) on hemp tissue.
-     - The network was trained first with the images in the folder "Neural Network Training Set 1" and underwent another round of training with "Neural Network Training Set 2". Both of these groups are in the parent folder: "Neural Network Training Images"
+     - The network was trained with one group of images, and then with a secondary set of images. 
      - The final neural network is named "HempDMNet3.mat"
 
 2. Analyzer_05.m (Matlab folder)
