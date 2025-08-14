@@ -24,7 +24,7 @@ Code is seperated into two folders, Matlab and R. Here is the order in which the
 4. Data Analysis - 8dpi.Rmd (In R folder) 
       - This code goes through the full data analysis using the dataset "Full_dataset.csv". 
       - This data set includes severity ratings generated from the Blackbird neural network, collected from visual ratings of leaf discs, and visual ratings of detached leaves. 
-      - For convience, "Full_dataset.csv" is contained in the R folder.  
+      - For convience, "Full_dataset.csv" is contained in the R folder as well as the data folder. 
    
 
 
