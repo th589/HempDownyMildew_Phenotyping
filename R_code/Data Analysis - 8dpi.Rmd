@@ -67,7 +67,6 @@ df <- df %>%
   left_join(name_map_df, by = "Accession") %>%
   mutate(Accession = if_else(!is.na(Cultivar), Cultivar, Accession)) %>%
   select(-Cultivar)  # optional: remove the now-unnecessary column
-
 ```
 
 ## Blackbird
@@ -181,9 +180,12 @@ print(paste("The number of accessions that have significanlty less disease than 
 ```{r}
 # Make a new dataframe denoting which accession comparisons are significant, and which are not
 dunnett_G33312_df <- dunnett_G33312_df %>%
-  mutate(significant = ifelse(p.value <= 0.05, "Yes", "No")) %>% # new column with significance
-  select(-estimate, -SE, -df, -t.ratio) %>%  # removing columns I dont want 
-  separate(contrast, into = c("Accession", "Reference"), sep = "-") # separating the first column so accessions is separate from G33379
+  mutate(
+    significant = ifelse(p.value <= 0.05, "Yes", "No"),
+    Accession = str_remove(contrast, " - G33312"),
+    Reference = "G33312"
+  ) %>%
+  select(-estimate, -SE, -df, -t.ratio, -contrast)
 ```
 
 ```{r}
@@ -209,10 +211,34 @@ print(paste("The number of accessions that have significanlty more disease than 
 ```{r}
 # Make a new dataframe denoting which accession comparisons are significant, and which are not
 dunnett_G33379_df <- dunnett_G33379_df %>%
-  mutate(significant = ifelse(p.value <= 0.05, "Yes", "No")) %>% # New column with significance
-  select(-estimate, -SE, -df, -t.ratio) %>%  # Removing columns I dont want 
-  separate(contrast, into = c("Accession", "Reference"), sep = "-") # Separating the first column so accessions is separate from G33379
+  mutate(
+    significant = ifelse(p.value <= 0.05, "Yes", "No"),
+    Accession = str_remove(contrast, " - Santhica 27"),
+    Reference = "Santhica 27"
+  ) %>%
+  select(-estimate, -SE, -df, -t.ratio, -contrast)
 ```
+
+
+```{r}
+#normalize accession column across all data frames 
+clean_accession <- function(x) {
+  x %>%
+    str_trim() %>%                  # remove leading/trailing spaces
+    str_remove_all("\\(|\\)")       # strip parentheses
+}
+
+# Apply to all relevant dataframes
+BB_8dpi_summary <- BB_8dpi_summary %>%
+  mutate(Accession = clean_accession(Accession))
+
+dunnett_G33312_df <- dunnett_G33312_df %>%
+  mutate(Accession = clean_accession(Accession))
+
+dunnett_G33379_df <- dunnett_G33379_df %>%
+  mutate(Accession = clean_accession(Accession))
+```
+
 
 ```{r}
 # Merge data - 8dpi mean and standard error (BB_8dpi_summary) with Dunnett pvalues from G33312 
@@ -340,7 +366,7 @@ p1 <- ggplot(df_fig1, aes(x = reorder(Accession, X8dpi_mean), y = X8dpi_mean, fi
       angle = 90,
       vjust = 0.5,
       hjust = 1,
-      size = 6,
+      size = 4,
       color = "black" #all labels in black 
     ),
     axis.title = element_text(size = 12), # axis title 
@@ -441,9 +467,12 @@ print(paste("The number of accessions that have significanlty less disease than 
 ```{r}
 # Make a new dataframe denoting which accession comparisons are significant, and which are not
 dunnett_G33312_df <- dunnett_G33312_df %>%
-  mutate(significant = ifelse(p.value <= 0.05, "Yes", "No")) %>% # new column with significance
-  select(-estimate, -SE, -df, -t.ratio) %>%  # removing columns I dont want 
-  separate(contrast, into = c("Accession", "Reference"), sep = "-") # separating the first column so accessions is separate from G33379
+  mutate(
+    significant = ifelse(p.value <= 0.05, "Yes", "No"),
+    Accession = str_remove(contrast, " - G33312"),
+    Reference = "G33312"
+  ) %>%
+  select(-estimate, -SE, -df, -t.ratio, -contrast)
 ```
 
 ```{r}
@@ -469,9 +498,31 @@ print(paste("The number of accessions that have significanlty more disease than 
 ```{r}
 # Make a new dataframe denoting which accession comparisons are significant, and which are not
 dunnett_G33379_df <- dunnett_G33379_df %>%
-  mutate(significant = ifelse(p.value <= 0.05, "Yes", "No")) %>% # New column with significance
-  select(-estimate, -SE, -df, -t.ratio) %>%  # Removing columns I dont want 
-  separate(contrast, into = c("Accession", "Reference"), sep = "-") # Separating the first column so accessions is separate from G33379
+  mutate(
+    significant = ifelse(p.value <= 0.05, "Yes", "No"),
+    Accession = str_remove(contrast, " - Santhica 27"),
+    Reference = "Santhica 27"
+  ) %>%
+  select(-estimate, -SE, -df, -t.ratio, -contrast)
+```
+
+```{r}
+#normalize accession column across all data frames 
+clean_accession <- function(x) {
+  x %>%
+    str_trim() %>%                  # remove leading/trailing spaces
+    str_remove_all("\\(|\\)")       # strip parentheses
+}
+
+# Apply to all relevant dataframes
+plot_8dpi_summary <- plot_8dpi_summary %>%
+  mutate(Accession = clean_accession(Accession))
+
+dunnett_G33312_df <- dunnett_G33312_df %>%
+  mutate(Accession = clean_accession(Accession))
+
+dunnett_G33379_df <- dunnett_G33379_df %>%
+  mutate(Accession = clean_accession(Accession))
 ```
 
 ```{r}
@@ -599,7 +650,7 @@ p1 <- ggplot(df_fig1, aes(x = reorder(Accession, X8dpi_mean), y = X8dpi_mean, fi
       angle = 90,
       vjust = 0.5,
       hjust = 1,
-      size = 6,
+      size = 4,
       color = "black"
     ),
     axis.title = element_text(size = 12), # axis title 
@@ -705,9 +756,12 @@ print(paste("The number of accessions that have significanlty less disease than 
 ```{r}
 # Make a new dataframe denoting which accession comparisons are significant, and which are not
 dunnett_G33312_df <- dunnett_G33312_df %>%
-  mutate(significant = ifelse(p.value <= 0.05, "Yes", "No")) %>% # new column with significance
-  select(-estimate, -SE, -df, -t.ratio) %>%  # removing columns I dont want 
-  separate(contrast, into = c("Accession", "Reference"), sep = "-") # separating the first column so accessions is separate from G33379
+  mutate(
+    significant = ifelse(p.value <= 0.05, "Yes", "No"),
+    Accession = str_remove(contrast, " - G33312"),
+    Reference = "G33312"
+  ) %>%
+  select(-estimate, -SE, -df, -t.ratio, -contrast)
 ```
 
 ```{r}
@@ -731,11 +785,33 @@ print(paste("The number of accessions that have significanlty more disease than 
 ## Organizing Dunnett Data
 
 ```{r}
-# Make a new dataframe denoting which accession comparisons are significant, and which are not
+#Make a new dataframe denoting which accession comparisons are significant, and which are not
 dunnett_G33379_df <- dunnett_G33379_df %>%
-  mutate(significant = ifelse(p.value <= 0.05, "Yes", "No")) %>% # New column with significance
-  select(-estimate, -SE, -df, -t.ratio) %>%  # Removing columns I dont want 
-  separate(contrast, into = c("Accession", "Reference"), sep = "-") # Separating the first column so accessions is separate from G33379
+  mutate(
+    significant = ifelse(p.value <= 0.05, "Yes", "No"),
+    Accession = str_remove(contrast, " - Santhica 27"),
+    Reference = "Santhica 27"
+  ) %>%
+  select(-estimate, -SE, -df, -t.ratio, -contrast)
+```
+
+```{r}
+# Normalize accession column across all data frames 
+clean_accession <- function(x) {
+  x %>%
+    str_trim() %>%                  # remove leading/trailing spaces
+    str_remove_all("\\(|\\)")       # strip parentheses
+}
+
+# Apply to all relevant dataframes
+detached_8dpi_summary <- detached_8dpi_summary %>%
+  mutate(Accession = clean_accession(Accession))
+
+dunnett_G33312_df <- dunnett_G33312_df %>%
+  mutate(Accession = clean_accession(Accession))
+
+dunnett_G33379_df <- dunnett_G33379_df %>%
+  mutate(Accession = clean_accession(Accession))
 ```
 
 ```{r}
@@ -866,7 +942,7 @@ p1 <- ggplot(df_fig1, aes(x = reorder(Accession, X8dpi_mean), y = X8dpi_mean, fi
       angle = 90,
       vjust = 0.5,
       hjust = 1,
-      size = 6,
+      size = 4,
       color = "black"
     ),
     axis.title = element_text(size = 12), # axis title 
@@ -995,7 +1071,7 @@ all_ratings_plot_gray <- ggplot(all_data, aes(x = Accession, y = X8dpi_mean)) +
       angle = 90,
       vjust = 0.5,
       hjust = 1,
-      size = 6,
+      size = 4,
       color = "black"
     ),
     axis.title = element_text(size = 12), # axis title 
