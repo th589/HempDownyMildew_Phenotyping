@@ -84,7 +84,34 @@ BB_df <- df %>%
 write_csv(BB_df, file ="BB_average.csv")
 ```
 
-#Leaf disc (labeled plot)
+### Blackbird missing datapoints 
+
+```{r}
+library(tidyverse)
+df <- read.csv("Full_dataset.csv", na.strings = ".")
+
+BB_df <- df %>% 
+  filter(Rating == "Blackbird")
+
+dpi_cols <- c("X5dpi", "X6dpi", "X7dpi", "X8dpi", "X9dpi")
+
+# Convert dpi columns to numeric (forces any remaining "." or invalid entries to NA)
+BB_df[dpi_cols] <- lapply(BB_df[dpi_cols], as.numeric)
+
+# Count missing values per dpi
+na_per_dpi <- sapply(BB_df[dpi_cols], function(x) sum(is.na(x)))
+print("Number of missing values per dpi:")
+print(na_per_dpi)
+
+# Count total missing values across 5–9 dpi
+total_na <- sum(is.na(BB_df[dpi_cols]))
+cat("Total missing values across 5–9 dpi:", total_na, "\n")
+
+# Number of expected data points at a given dpi
+cat("the number of datapoints in a given dpi is:", nrow(BB_df))
+```
+
+## Leaf disc (labeled plot)
 
 ```{r}
 # Leaf disc rating by eye dataframe and csv
@@ -343,7 +370,7 @@ df_fig1$Group <- factor(df_fig1$Group, levels = c("Significant", "Not significan
 df_fig1 <- df_fig1 %>% arrange(X8dpi_mean)
 
 # Define fill color
-fill_colors <- c("Significant" = "#4D4D4D", "Not significant" = "#D9D9D9")
+fill_colors <- c("Significant" = "#7C6BAF", "Not significant" = "#D9D9D9")
  #old sig colors #4C8C8A not sig gray
 # Plot
 p1 <- ggplot(df_fig1, aes(x = reorder(Accession, X8dpi_mean), y = X8dpi_mean, fill = Group)) +
@@ -379,7 +406,7 @@ p1 <- ggplot(df_fig1, aes(x = reorder(Accession, X8dpi_mean), y = X8dpi_mean, fi
     legend.text = element_text(size = 10)
   ) +
   labs(
-    x = "Accession",
+    x = "Entry",
     y = "Disease Severity (0–100%)",
     fill = "Statistical Difference from Susceptible Control"
   ) +
@@ -627,7 +654,7 @@ df_fig1$Group <- factor(df_fig1$Group, levels = c("Significant", "Not significan
 df_fig1 <- df_fig1 %>% arrange(X8dpi_mean)
 
 # Define fill color
-fill_colors <- c("Significant" = "#4D4D4D", "Not significant" = "#D9D9D9")
+fill_colors <- c("Significant" = "#3AAFB9", "Not significant" = "#D9D9D9")
 
 # Plot
 p1 <- ggplot(df_fig1, aes(x = reorder(Accession, X8dpi_mean), y = X8dpi_mean, fill = Group)) +
@@ -663,7 +690,7 @@ p1 <- ggplot(df_fig1, aes(x = reorder(Accession, X8dpi_mean), y = X8dpi_mean, fi
     legend.text = element_text(size = 10)
   ) +
   labs(
-    x = "Accession",
+    x = "Entry",
     y = "Disease Severity (0–100%)",
     fill = "Statistical Difference from Susceptible Control"
   ) +
@@ -919,7 +946,7 @@ df_fig1$Group <- factor(df_fig1$Group, levels = c("Significant", "Not significan
 df_fig1 <- df_fig1 %>% arrange(X8dpi_mean)
 
 # Define fill color
-fill_colors <- c("Significant" = "#4D4D4D", "Not significant" = "#D9D9D9")
+fill_colors <- c("Significant" = "#D8817A", "Not significant" = "#D9D9D9")
 
 # Plot
 p1 <- ggplot(df_fig1, aes(x = reorder(Accession, X8dpi_mean), y = X8dpi_mean, fill = Group)) +
@@ -955,7 +982,7 @@ p1 <- ggplot(df_fig1, aes(x = reorder(Accession, X8dpi_mean), y = X8dpi_mean, fi
     legend.text = element_text(size = 10)
   ) +
   labs(
-    x = "Accession",
+    x = "Entry",
     y = "Disease Severity (0–100%)",
     fill = "Statistical Difference from Susceptible Control"
   ) +
@@ -1029,15 +1056,15 @@ all_data$Method <- factor(all_data$Method, levels = c("Blackbird", "Plot", "Deta
 
 # Legend labels
 method_labels <- c(
-  "Blackbird" = "Leaf Discs Rated by Blackbird Neural Network",
+  "Blackbird" = "Leaf Discs Rated by Blackbird Convolutional Neural Network",
   "Plot" = "Leaf Discs Rated Visually",
   "Detached" = "Detached Leaves Rated Visually")
 
 # colors and point shapes
 method_grays <- c(
-  "Blackbird" = "gray10",
-  "Plot" = "gray40",
-  "Detached" = "gray70")
+  "Blackbird" = "#7C6BAF",
+  "Plot" = "#3AAFB9",
+  "Detached" = "#D8817A")
 
 method_shapes <- c(
    "Blackbird" = 16,
@@ -1059,7 +1086,7 @@ all_ratings_plot_gray <- ggplot(all_data, aes(x = Accession, y = X8dpi_mean)) +
     shape = guide_legend(title = "Rating Method")) +
   
   labs(
-    x = "Accession", 
+    x = "Entry", 
     y = "Disease Severity (0–100%)",
   ) +
   theme_classic() +
@@ -1087,97 +1114,98 @@ all_ratings_plot_gray <- ggplot(all_data, aes(x = Accession, y = X8dpi_mean)) +
 plot(all_ratings_plot_gray)
 
 #Save Plot: 
-ggsave("8dpi/Figures/All_rating_methods_8dpi_gray.tiff", plot = all_ratings_plot_gray,dpi = 600, width = 6.5, height = 4.5, units = "in", compression = "lzw")
+ggsave("8dpi/Figures/All_rating_methods_8dpi.tiff", plot = all_ratings_plot_gray,dpi = 600, width = 6.5, height = 4.5, units = "in", compression = "lzw")
 ```
 
 ## Resistant accessions across methods:
-
 ```{r}
-# Prepare each method:
+
+# Prepare long-form data for each method
+
 BB_long <- BB_df %>% 
   select(Accession, Rep, X8dpi) %>% 
   rename(BB = X8dpi)
+
 plot_long <- plot_df %>% 
   select(Accession, Rep, X8dpi) %>% 
   rename(Plot = X8dpi)
+
 detached_long <- detached_df %>% 
   select(Accession, Rep, X8dpi) %>% 
   rename(Detached = X8dpi)
 
-# Flag accessions consistently <1% and ==0% per method
+
+# Flag function per method (0%, ≤1%, ≤5%)
+
 flag_method <- function(df, varname) {
   df %>%
     group_by(Accession) %>%
     summarise(
-      all_below_5 = all(.data[[varname]] < 5, na.rm = TRUE),
-      all_below_1 = all(.data[[varname]] < 1, na.rm = TRUE),
-      all_zero = all(.data[[varname]] == 0, na.rm = TRUE),
+      all_below_5 = all(.data[[varname]] <= 5, na.rm = TRUE),
+      all_below_1 = all(.data[[varname]] <= 1, na.rm = TRUE),
+      all_zero    = all(.data[[varname]] == 0, na.rm = TRUE),
       .groups = "drop"
     ) %>%
     rename_with(~ paste0(varname, "_", .), -Accession)
 }
 
-# Apply to each method
-BB_flags <- flag_method(BB_long, "BB")
-plot_flags <- flag_method(plot_long, "Plot")
+# Apply flags
+BB_flags       <- flag_method(BB_long, "BB")
+plot_flags     <- flag_method(plot_long, "Plot")
 detached_flags <- flag_method(detached_long, "Detached")
 
-# Merge all
+# Merge flags across methods
+
 all_flags <- BB_flags %>%
   full_join(plot_flags, by = "Accession") %>%
   full_join(detached_flags, by = "Accession")
 
-# Add summary flags: all three methods <1% and ==0%
+
+# Summary flags across all methods
+
 final_table <- all_flags %>%
   mutate(
     all_methods_below_5 = BB_all_below_5 & Plot_all_below_5 & Detached_all_below_5,
     all_methods_below_1 = BB_all_below_1 & Plot_all_below_1 & Detached_all_below_1,
-    all_methods_zero = BB_all_zero & Plot_all_zero & Detached_all_zero
+    all_methods_zero    = BB_all_zero & Plot_all_zero & Detached_all_zero
   )
 
-# Save
-write_csv(final_table, "8dpi/Resistant_Entries.csv")
-```
 
-```{r}
-# Helper function to pad each vector to the same length
+# Create named lists of accessions per group
+
 pad_to_length <- function(vec, max_length) {
-  length(vec) <- max_length  # adds NA if needed
+  length(vec) <- max_length
   return(vec)
 }
 
-# Create named lists of accessions per group
 accession_groups <- list(
-  `BB <5%` = final_table %>% filter(BB_all_below_5) %>% pull(Accession),
-  `Plot <5%` = final_table %>% filter(Plot_all_below_5) %>% pull(Accession),
-  `Detached <5%` = final_table %>% filter(Detached_all_below_5) %>% pull(Accession),
-  `BB <1%` = final_table %>% filter(BB_all_below_1) %>% pull(Accession),
-  `Plot <1%` = final_table %>% filter(Plot_all_below_1) %>% pull(Accession),
-  `Detached <1%` = final_table %>% filter(Detached_all_below_1) %>% pull(Accession),
-  `BB = 0%` = final_table %>% filter(BB_all_zero) %>% pull(Accession),
-  `Plot = 0%` = final_table %>% filter(Plot_all_zero) %>% pull(Accession),
-  `Detached = 0%` = final_table %>% filter(Detached_all_zero) %>% pull(Accession),
-  `All methods <5%` = final_table %>% filter(all_methods_below_5) %>% pull(Accession),
-  `All methods <1%` = final_table %>% filter(all_methods_below_1) %>% pull(Accession),
-  `All methods = 0%` = final_table %>% filter(all_methods_zero) %>% pull(Accession)
+  `BB LE5%`        = final_table %>% filter(BB_all_below_5) %>% pull(Accession),
+  `Plot LE5%`      = final_table %>% filter(Plot_all_below_5) %>% pull(Accession),
+  `Detached LE5%`  = final_table %>% filter(Detached_all_below_5) %>% pull(Accession),
+  `BB LE1%`        = final_table %>% filter(BB_all_below_1) %>% pull(Accession),
+  `Plot LE1%`      = final_table %>% filter(Plot_all_below_1) %>% pull(Accession),
+  `Detached LE1%`  = final_table %>% filter(Detached_all_below_1) %>% pull(Accession),
+  `BB 0%`          = final_table %>% filter(BB_all_zero) %>% pull(Accession),
+  `Plot 0%`        = final_table %>% filter(Plot_all_zero) %>% pull(Accession),
+  `Detached 0%`    = final_table %>% filter(Detached_all_zero) %>% pull(Accession),
+  `All methods LE5%` = final_table %>% filter(all_methods_below_5) %>% pull(Accession),
+  `All methods LE1%` = final_table %>% filter(all_methods_below_1) %>% pull(Accession),
+  `All methods 0%`   = final_table %>% filter(all_methods_zero) %>% pull(Accession)
 )
 
-# Find the longest list length
-max_length <- max(lengths(accession_groups))
+max_len <- max(lengths(accession_groups))
 
-# Pad each vector and convert to a tibble
-accession_table <- accession_groups %>%
-  map(~ pad_to_length(.x, max_length)) %>%
+resistant_table <- accession_groups %>%
+  map(~ pad_to_length(.x, max_len)) %>%
   as_tibble()
 
-# View or export
-write_csv(accession_table, "8dpi/Resistant_Entries.csv")
+write_csv(resistant_table, "8dpi/Resistant_Entries.csv")
 ```
 
-## Susceptable accessions:
-
 ```{r}
-# Mean severity per accession
+# Top 5 accessions by average severity
+
+# Compute mean severity per accession
 BB_means <- BB_df %>%
   group_by(Accession) %>%
   summarise(BB_mean = mean(X8dpi, na.rm = TRUE), .groups = "drop")
@@ -1189,86 +1217,23 @@ plot_means <- plot_df %>%
 detached_means <- detached_df %>%
   group_by(Accession) %>%
   summarise(Detached_mean = mean(X8dpi, na.rm = TRUE), .groups = "drop")
-```
 
-```{r}
-top10_BB <- BB_means %>%
-  arrange(desc(BB_mean)) %>%
-  slice_head(n = 10) %>%
-  pull(Accession)
-
-top10_plot <- plot_means %>%
-  arrange(desc(Plot_mean)) %>%
-  slice_head(n = 10) %>%
-  pull(Accession)
-
-top10_detached <- detached_means %>%
-  arrange(desc(Detached_mean)) %>%
-  slice_head(n = 10) %>%
-  pull(Accession)
-```
-
-```{r}
-consistently_susceptible <- Reduce(intersect, list(top10_BB, top10_plot, top10_detached))
-
-# Also get Top 5 from already sorted means
-top5_BB_sorted <- sort(top10_BB[1:5])
-top5_plot_sorted <- sort(top10_plot[1:5])
-top5_detached_sorted <- sort(top10_detached[1:5])
-
-# Find consistent top 5 across all methods
-top5_all_sorted <- Reduce(intersect, list(top5_BB_sorted, top5_plot_sorted, top5_detached_sorted)) %>% sort()
-
-# Pad helper
-pad_to_length <- function(vec, max_length) {
-  length(vec) <- max_length
-  return(vec)
-}
-
-# Put all into one named list
-accession_groups_susceptible <- list(
-  `Top 10 BB` = sort(top10_BB),
-  `Top 10 Plot` = sort(top10_plot),
-  `Top 10 Detached` = sort(top10_detached),
-  `Top 10 All Methods` = sort(consistently_susceptible),
-  `Top 5 BB` = top5_BB_sorted,
-  `Top 5 Plot` = top5_plot_sorted,
-  `Top 5 Detached` = top5_detached_sorted,
-  `Top 5 All Methods` = top5_all_sorted
-)
-
-#Pad and bind into initial table
-max_len <- max(lengths(accession_groups_susceptible))
-
-susceptible_table_extended <- accession_groups_susceptible %>%
-  map(~ pad_to_length(.x, max_len)) %>%
-  as_tibble()
-
-#Add mean severity values for consistent accessions
-
-#Combine accession means
 all_means <- BB_means %>%
   full_join(plot_means, by = "Accession") %>%
-  full_join(detached_means, by = "Accession")
-
-# Calculate average severity across methods
-all_means <- all_means %>%
+  full_join(detached_means, by = "Accession") %>%
   rowwise() %>%
   mutate(Average_Severity = mean(c(BB_mean, Plot_mean, Detached_mean), na.rm = TRUE)) %>%
   ungroup()
 
-# Add average severity values to the "Top 10 All Methods" and "Top 5 All Methods" columns
-susceptible_table_extended <- susceptible_table_extended %>%
-  mutate(
-    `Top 10 Avg Severity` = `Top 10 All Methods` %>%
-      map_dbl(~ all_means %>% filter(Accession == .x) %>% pull(Average_Severity) %>% first() %||% NA_real_),
-    `Top 5 Avg Severity` = `Top 5 All Methods` %>%
-      map_dbl(~ all_means %>% filter(Accession == .x) %>% pull(Average_Severity) %>% first() %||% NA_real_)
-  )
+# Get top 5 accessions by average severity
+top5_accessions <- all_means %>%
+  arrange(desc(Average_Severity)) %>%
+  slice_head(n = 5)
 
-#save 
-write_csv(susceptible_table_extended, "8dpi/Susceptible_Top10_Top5.csv")
+write_csv(top5_accessions, "8dpi/Top5_Average_Severity.csv")
+
 ```
+
 
 ## Statistical comparison of rating methods:
 
@@ -1333,3 +1298,50 @@ cld(emm, adjust = "tukey")
 | Detached  | 0.321              | 0.137 - 0.505           | A           |
 | Blackbird | 0.394              | 0.210 - 0.578           | B           |
 | Leaf Disc | 0.505              | 0.321 - 0.689           | C           |
+
+
+## Correlation
+```{r}
+#Read in dataframes: 
+BB_df <- read_csv("BB_average.csv")
+plot_df <- read_csv("Plot_average.csv")
+detached_df <- read_csv("Detached_average.csv")
+
+#Keep columns of interest and rename 8dpi column 
+bb_8dpi <- BB_df %>%
+  dplyr::select(Accession, Rep, Blackbird_CNN = X8dpi)
+
+plot_8dpi <- plot_df %>%
+  dplyr::select(Accession, Rep, Leaf_disc = X8dpi)
+
+detached_8dpi <- detached_df %>%
+  dplyr::select(Accession, Rep, Detached_leaf = X8dpi)
+
+#Join together 
+merged_df <- bb_8dpi %>%
+  left_join(plot_8dpi, by = c("Accession", "Rep")) %>%
+  left_join(detached_8dpi, by = c("Accession", "Rep"))
+
+#Save data sheet so I can look at it:
+write_csv(merged_df, file ="Allmethods_reps_8dpi.csv")
+```
+
+```{r}
+# Pairwise correlations 
+
+cor_matrix <- cor(merged_df[, c("Blackbird_CNN", "Leaf_disc", "Detached_leaf")],
+                  use = "pairwise.complete.obs",
+                  method = "pearson")  # or "spearman"
+cor_matrix
+```
+BB vs Plot: 0.92 --> very strong correlation
+BB vs detached: 0.73 --> strong correlation 
+Plot vs Detached: 0.68 --> moderate correlation 
+
+All three rating methods are positively correlated, with the two leaf disc methods agreeing the most. 
+
+```{r}
+library(GGally)
+ggpairs(merged_df[, c("Blackbird_CNN", "Leaf_disc", "Detached_leaf")])
+```
+
