@@ -22,8 +22,8 @@ Code is seperated into two folders, Matlab and R. Here is the order in which the
   
 4. Quick Look up application (In R folder)
       - This custom R Siny application, written by A.J. Ackerman, allowed Blackbird output images to be visually inspected with ease allowing rapid look up and examination of leaf disc images. 
-           - quick_lookup_macos_V8.3-app.R
-           - quick_lookup_win_V8.3-app.R
+           - quick_lookup_macos_V9.1-app.R
+           - quick_lookup_win_V9.1-app.R
 
 5. Data Analysis (In R folder) 
       - This code goes through the full data analysis using the dataset "Full_dataset.csv". 
