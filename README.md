@@ -20,7 +20,12 @@ Code is seperated into two folders, Matlab and R. Here is the order in which the
     - Click export results, then in the menu that opens select "threshold" and enter lower and upper thresholds for category assignments or select average.
     - select a directory to save the result file and define a file name. The app will generate an excel file with results from your given threshold with a sheet for each tray and a column for each date.
   
-4. Data Analysis (In R folder) 
+4. Quick Look up application (In R folder)
+      - This custom R Siny application, written by A.J. Ackerman, allowed Blackbird output images to be visually inspected with ease allowing rapid look up and examination of leaf disc images. 
+           - quick_lookup_macos_V8.3-app.R
+           - quick_lookup_win_V8.3-app.R
+
+5. Data Analysis (In R folder) 
       - This code goes through the full data analysis using the dataset "Full_dataset.csv". 
            - This data set includes severity ratings generated from the Blackbird neural network, collected from visual ratings of leaf discs, and visual ratings of detached leaves. 
            - For convience, "Full_dataset.csv" is contained in the R folder as well as the data folder.
@@ -30,11 +35,3 @@ Code is seperated into two folders, Matlab and R. Here is the order in which the
            - 03_Leaf_disc_Analysis.Rmd
            - 04_Detacehd_Leaf_Analysis.Rmd
            - 05_Rating_Method_Comparison.Rmd
-
-5. Quick Look up application (In R folder)
-      - This custom R Siny application, written by A.J. Ackerman, allowed Blackbird output images to be visually inspected with ease allowing rapid look up and examination of leaf disc images. 
-           - quick_lookup_macos_V8.3-app.R
-           - quick_lookup_win_V8.3-app.R
-   
-
-
