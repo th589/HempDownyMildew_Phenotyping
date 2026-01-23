@@ -1,0 +1,112 @@
+---
+title: "Data Preprocessing"
+author: "Taylere Herrmann"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r}
+#library
+library(tidyverse)
+```
+
+```{r}
+# read dataset 
+df <- read.csv("Full_dataset.csv", na.strings = ".")
+```
+
+```{r}
+# rename hemp entries 
+
+name_map <- c(
+  "G33203" = "Cherry Wine",
+  "G33208" = "Magic Bullet 5",
+  "G33209" = "Spectrum",
+  "G33236" = "FL 58",
+  "G33294" = "BaOx",
+  "G33314" = "AC/DC",
+  "G33315" = "Otto II",
+  "G33337" = "Tisza",
+  "G33341" = "Tiborszallasi",
+  "G33344" = "Blue Kross",
+  "G33365" = "Queen Dream",
+  "G33368" = "Henola",
+  "G33370" = "SS Beta",
+  "G33371" = "Bialobrzeskie",
+  "G33376" = "Fibror 79",
+  "G33379" = "Santhica 27",
+  "G33380" = "Santhica 70",
+  "G33382" = "PhotoCBD",
+  "G33534" = "G33534 23UO SD",
+  "G33574" = "Ursa® 'Grande'",
+  "G33575" = "Ursa® 'Alta'",
+  "G33580" = "TJs CBD",
+  "G33591" = "USO 31",
+  "G33592" = "Carmagnola",
+  "G33650" = "CFX-2",
+  "GVA-H-20-1144" = "Sweet Caroline",
+  "G33571" = "GVA-H-21-1077",
+  "G33573" = "GVA-H-22-1166",
+  "G33576" = "GVA-H-23-1142"
+)
+
+df <- df %>%
+  mutate(
+    Accession = recode(Accession, !!!name_map)
+  )
+```
+
+
+```{r}
+#Average plots
+average_method <- function(data, rating_name) {
+  data %>%
+    filter(Rating == rating_name, Isolate == 22031) %>%
+    group_by(Batch, Accession, Rep) %>%
+    summarise(
+      across(
+        c(X0dpi, X5dpi, X6dpi, X7dpi, X8dpi, X9dpi),
+        ~ round(mean(.x, na.rm = TRUE), 1)
+      ),
+      .groups = "drop"
+    )
+}
+```
+
+
+```{r}
+#Create & save three data sets 
+BB_df       <- average_method(df, "Blackbird")
+plot_df     <- average_method(df, "Plot")
+detached_df <- average_method(df, "Detached")
+
+write_csv(BB_df,"BB_average.csv")
+write_csv(plot_df,"Plot_average.csv")
+write_csv(detached_df,"Detached_average.csv")
+```
+
+```{r}
+#Blackbird missing datapoint diagnostics 
+df <- read.csv("Full_dataset.csv", na.strings = ".")
+
+BB_df <- df %>% 
+  filter(Rating == "Blackbird")
+
+dpi_cols <- c("X5dpi", "X6dpi", "X7dpi", "X8dpi", "X9dpi")
+
+# Convert dpi columns to numeric (forces any remaining "." or invalid entries to NA)
+BB_df[dpi_cols] <- lapply(BB_df[dpi_cols], as.numeric)
+
+# Count missing values per dpi
+na_per_dpi <- sapply(BB_df[dpi_cols], function(x) sum(is.na(x)))
+print("Number of missing values per dpi:")
+print(na_per_dpi)
+
+# Count total missing values across 5–9 dpi
+total_na <- sum(is.na(BB_df[dpi_cols]))
+cat("Total missing values across 5–9 dpi:", total_na, "\n")
+
+# Number of expected data points at a given dpi
+cat("the number of datapoints in a given dpi is:", nrow(BB_df))
+```
+
