@@ -21,7 +21,7 @@ Code is seperated into two folders, Matlab and R. Here is the order in which the
     - select a directory to save the result file and define a file name. The app will generate an excel file with results from your given threshold with a sheet for each tray and a column for each date.
   
 4. Quick Look up application (In R folder)
-      - This custom R Siny application, written by A.J. Ackerman, allowed Blackbird output images to be visually inspected with ease allowing rapid look up and examination of leaf disc images. 
+      - This custom R Shiny application, written by A.J. Ackerman, allowed Blackbird output images to be visually inspected with ease allowing rapid look up and examination of leaf disc images. 
            - quick_lookup_macos_V9.1-app.R
            - quick_lookup_win_V9.1-app.R
 
