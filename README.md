@@ -6,7 +6,7 @@ Code is seperated into two folders, Matlab and R. Here is the order in which the
 
 1. user_training_GUI_7.m (Matlab folder)
      - This was used to train the convolutional neural network to detect signs of _Pseudoperonospora cannabina__ (downy mildew) on hemp tissue.
-     - The network was trained with one group of images, and then with a secondary set of images. These images can be found here: https://cornell.box.com/s/h170ksoypl9l1ajwihmd46ju26zwucn5<img
+     - The network was trained with one group of images, and then with a secondary set of images. These images can be found here: https://cornell.box.com/s/h170ksoypl9l1ajwihmd46ju26zwucn5
      - The final neural network is named "HempDMNet3.mat"
 
 2. Analyzer_05.m (Matlab folder)
