@@ -6,11 +6,12 @@ Code is seperated into two folders, Matlab and R. Here is the order in which the
 
 1. user_training_GUI_7.m (Matlab folder)
      - This was used to train the convolutional neural network to detect signs of _Pseudoperonospora cannabina__ (downy mildew) on hemp tissue.
-     - The network was trained with one group of images, and then with a secondary set of images. These images can be found here: https://cornell.box.com/s/h170ksoypl9l1ajwihmd46ju26zwucn5<img width="468" height="14" alt="image" src="https://github.com/user-attachments/assets/5e1e46a3-08e2-49f5-be09-53e2a8780395" />
+     - The network was trained with one group of images, and then with a secondary set of images. These images can be found here: https://cornell.box.com/s/h170ksoypl9l1ajwihmd46ju26zwucn5<img
      - The final neural network is named "HempDMNet3.mat"
 
 2. Analyzer_05.m (Matlab folder)
-     - This code was used to analyze the images that were taken by the Blackbird machiene
+     - This code was used to analyze the images that were taken by the Blackbird machiene.
+     - All Blackbird images not used for training and validation are availible here: at https://cornell.box.com/s/8v5ul8uz5ipcwg65m3bw10ezswux6dnq
      - In line 280, it is specified that the neural network HempDMNet3.mat is loaded. This can be changed to a neural network of your choosing.
      - Run the script, then select open and choose the directory of the experiment, then start analysis
      - After analysis, a score file (.score) will be saved in the experiment file 
