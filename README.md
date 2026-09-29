@@ -1,6 +1,6 @@
 # HempDownyMildew_Phenotyping
 
-This repository contains code and data associated with Evaluation of downy mildew resistance in the USDA Hemp Germplasm Repository using high-throughput and traditional phenotyping methods by Herrmann et al. (in preparation). 
+This repository contains code and data associated with Evaluation of downy mildew resistance in the USDA Hemp Germplasm Repository using high-throughput and traditional phenotyping methods by Herrmann et al. 2026. 
 
 Code is seperated into two folders, Matlab and R. Here is the order in which the code/files were used:
 
